@@ -7,7 +7,7 @@ from urllib.parse import urlparse, urljoin
 import json
 from os import makedirs
 from os.path import exists
-
+import multiprocessing
 
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(levelname)s: - %(message)s')
@@ -77,19 +77,26 @@ def save_data(data):
     data_path = f'{RESULT_DIR}/{name}.json'
     json.dump(data, open(data_path, 'w', encoding='utf-8'), ensure_ascii=False,indent=2)
 
+# 多线程加速
+# 选用多进程的里面的进程池pool，可以实现多个进程同时运行，提高爬取速度。
+# main方法里添加一个参数page
 # 主函数
 def main():
-    for page in range(1, TOTAL_PAGES+1):
-        index_html = scrape_index(page)
-        detail_urls = parse_index(index_html)
-        for detail_url in detail_urls:
-            detail_html = scrape_detail(detail_url)
-            data = parse_detail(detail_html)
-            logging.info('get detail data%s', data)
-            logging.info('saving data to json file')
-            save_data(data)
-            logging.info('data saved successfully')
+    index_html = scrape_index(page)
+    detail_urls = parse_index(index_html)
+    for detail_url in detail_urls:
+        detail_html = scrape_detail(detail_url)
+        data = parse_detail(detail_html)
+        logging.info('get detail data%s', data)
+        logging.info('saving data to json file')
+        save_data(data)
+        logging.info('data saved successfully')
         # logging.info('detail urls %s', list(detail_urls))
 
 if __name__ == '__main__':
-    main()
+    # 多线程加速
+    pool = multiprocessing.Pool()
+    pages = range(1, TOTAL_PAGES+1)
+    pool.map(main, pages)
+    pool.close()
+    pool.join()
