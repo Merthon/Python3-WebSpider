@@ -81,7 +81,7 @@ def save_data(data):
 # 选用多进程的里面的进程池pool，可以实现多个进程同时运行，提高爬取速度。
 # main方法里添加一个参数page
 # 主函数
-def main():
+def main(page):
     index_html = scrape_index(page)
     detail_urls = parse_index(index_html)
     for detail_url in detail_urls:
