@@ -2,7 +2,7 @@
 import pymongo
 
 # 连接MongoDB数据库
-client = pymongo.MongoClient('localhost', 27017)
+client = pymongo.MongoClient('mongodb://admin:admin@localhost:27017/')
 
 # 连接数据库
 db = client['test']
