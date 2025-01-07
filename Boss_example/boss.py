@@ -2,7 +2,7 @@
 from DrissionPage import ChromiumPage
 import csv
 
-f = open('data.csv',mode='w',encoding='utf-8',newline='')
+f = open('./job_data.csv',mode='w',encoding='utf-8',newline='')
 #字典写入方法
 csv_writer = csv.DictWriter(f, fieldnames=[
     '职位',
@@ -54,5 +54,5 @@ for page in range(1,11):
     print(dit)
     # 点击下一页（元素定位）
     #<i class="ui-icon-arrow-right"></i>
-    dp.ele('css:.ui-icon-arrow-right').click()
+    dp.ele('css:.options-pages a:last-of-type').click()
 
