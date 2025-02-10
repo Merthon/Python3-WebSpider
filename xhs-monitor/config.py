@@ -5,13 +5,11 @@ XHS_CONFIG = {
 }
 
 WECOM_CONFIG = {
-    "CORPID": "ww37c0b3c0eb30b914",
-    "AGENTID": 1000002,
-    "SECRET": "dHW3PFTrizE-t_tVAJhFGdeCNZQuwxtFH5PbCfnIJc0",
+    "WEBHOOK_URL": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=294dc5f2-9112-4ca4-a396-b604f2032c04"
 }
 
 MONITOR_CONFIG = {
-    "USER_ID": "5b8a29d56c11370001d4d254",
+    "USER_ID": "5b8a29d56c11370001d4d254", #  5b8a29d56c11370001d4d254
     "CHECK_INTERVAL": 60,
     "ERROR_COUNT": 10,
 }

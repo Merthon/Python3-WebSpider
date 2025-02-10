@@ -8,16 +8,9 @@ from wecom import WecomMessage
 
 
 class XHSMonitor:
-    def __init__(self, cookie: str, corpid: str, agentid: int, secret: str):
-        """
-        初始化监控类
-        :param cookie: 小红书cookie
-        :param corpid: 企业ID
-        :param agentid: 应用ID
-        :param secret: 应用的Secret
-        """
-        self.client = XhsClient(cookie=cookie, sign=xhs_sign)  # 使用传入的 xhs_sign
-        self.wecom = WecomMessage(corpid, agentid, secret)
+    def __init__(self, cookie: str, webhook_url: str):
+        self.client = XhsClient(cookie=cookie, sign=xhs_sign)
+        self.wecom = WecomMessage(webhook_url)  # 改为 Webhook 方式
         self.db = Database()
         self.error_count = 0
 
@@ -108,9 +101,7 @@ class XHSMonitor:
 def main():
     monitor = XHSMonitor(
         cookie=XHS_CONFIG["COOKIE"],
-        corpid=WECOM_CONFIG["CORPID"],
-        agentid=WECOM_CONFIG["AGENTID"],
-        secret=WECOM_CONFIG["SECRET"]
+        webhook_url=WECOM_CONFIG["WEBHOOK_URL"]  # ⬅️ 改成 webhook_url
     )
 
     monitor.monitor_user(
