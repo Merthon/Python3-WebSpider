@@ -17,3 +17,8 @@ __pycache__/
 *.log
 *.swp
 
+# 数据库文件
+*.db
+
+# 配置文件
+config.py

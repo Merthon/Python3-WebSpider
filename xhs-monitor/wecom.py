@@ -9,22 +9,30 @@ class WecomMessage:
         """
         发送文本消息
         :param content: 消息内容
+        :return: 是否发送成功
         """
         try:
-            message = {"msgtype": "text", "text": {"content": content}}
-            response = requests.post(self.webhook_url, json=message)
+            message = {
+                "msgtype": "text",
+                "text": {
+                    "content": content
+                },
+                "enable_duplicate_check": 1,
+                "duplicate_check_interval": 1800
+            }
+            response = requests.post(self.webhook_url,json=message)
             result = response.json()
-
+            
             if result.get("errcode") == 0:
-                print("企业微信消息发送成功")
+                print(f"群机器人消息发送成功")
                 return True
             else:
-                print(f"企业微信消息发送失败: {result}")
+                print(f"群消息机器人发送失败: {result}")
                 return False
-
+                
         except Exception as e:
-            print(f"企业微信消息发送异常: {e}")
-            return False
-
+            print(f"群机器人消息发送异常: {e}")
+            return False 
+        
         finally:
             time.sleep(1.5)  # 限流，避免超限
