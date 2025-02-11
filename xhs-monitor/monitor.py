@@ -9,6 +9,7 @@ from comment_generator import CommentGenerator
 
 class XHSMonitor:
     def __init__(self, cookie: str, webhook_url: str):
+        # 初始化小红书客户端，传入 Cookie 和签名
         self.client = XhsClient(cookie=cookie, sign=xhs_sign)
         self.wecom = WecomMessage(webhook_url)
         self.db = Database()
@@ -35,19 +36,19 @@ class XHSMonitor:
         :return: 笔记列表
         """
         try:
+            # 请求获取用户笔记数据
             res_data = self.client.get_user_notes(user_id)
             self.error_count = 0
             return res_data.get('notes', [])
             
         except Exception as e:
+            # 如果发生错误，记录日志并进行重试
             error_msg = str(e)
-
             print(f"获取用户笔记失败: {error_msg}")
-
             time.sleep(60)
 
             self.error_count += 1
-
+            # 如果连续错误次数达到阈值，发送告警并终止程序
             if self.error_count >= MONITOR_CONFIG["ERROR_COUNT"]:
                 self.send_error_notification(f"API 请求失败\n详细信息：{error_msg}")
                 exit(-1)
@@ -61,6 +62,7 @@ class XHSMonitor:
         :return: 是否成功
         """
         try:
+            # 添加点赞延迟，防止操作过快
             time.sleep(MONITOR_CONFIG["LIKE_DELAY"])  # 添加延迟，避免操作过快
             self.client.like_note(note_id)
             print(f"点赞成功: {note_id}")
@@ -76,6 +78,7 @@ class XHSMonitor:
         :return: 笔记详细信息
         """
         try:
+             # 请求笔记详情
             uri = '/api/sns/web/v1/feed'
             data = {"source_note_id": note_id, "image_formats": ["jpg", "webp", "avif"], "extra": {"need_body_topic": "1"}, "xsec_source": "pc_search", "xsec_token": xsec}
             res = self.client.post(uri, data=data)
@@ -93,18 +96,14 @@ class XHSMonitor:
         :return: 评论结果
         """
         try:
+            # 添加评论延迟，防止操作过快
             time.sleep(MONITOR_CONFIG["COMMENT_DELAY"])
-            
             note_detail = self.get_note_detail(note_id, note_data.get('xsec_token', ''))
-            
             title = note_detail.get('title', '')
             content = note_detail.get('desc', '')
-            
             note_type = '视频' if note_detail.get('type') == 'video' else '图文'
             content = f"这是一个{note_type}笔记。{content}"
-            
             comment = self.comment_generator.generate_comment(title, content)
-            
             # 在评论生成成功后进行评论
             if comment:
                 self.client.comment_note(note_id, comment)
@@ -135,9 +134,9 @@ class XHSMonitor:
         note_id = note_data.get('note_id')
         if not note_id:
             return result
-
+        # 执行点赞操作
         result["like_status"] = self.like_note(note_id)
-        
+        # 执行评论操作
         comment_result = self.comment_note(note_id, note_data)
 
         result["comment_status"] = comment_result["comment_status"]
@@ -156,7 +155,7 @@ class XHSMonitor:
         title = note_data.get('display_title', '无标题')
         type = note_data.get('type', '未知类型')
         time_str = time.strftime('%Y-%m-%d %H:%M:%S')
-        
+        # 构造通知内容
         content = [
             "小红书用户发布新笔记",
             f"用户：{user_name}",
@@ -189,12 +188,14 @@ class XHSMonitor:
         
         while True:
             try:
+                # 获取用户最新的笔记
                 latest_notes = self.get_latest_notes(user_id)
-                
+                # 检查该用户是否为首次监控
                 existing_notes = self.db.get_user_notes_count(user_id)
                 is_first_monitor = existing_notes == 0 and len(latest_notes) > 1
                 
                 if is_first_monitor:
+                    # 如果是首次监控，发送欢迎消息并记录笔记
                     welcome_msg = (
                         f"欢迎使用 xhs-monitor 系统\n"
                         f"监控用户：{latest_notes[0].get('user', {}).get('nickname', user_id)}\n"
@@ -206,6 +207,7 @@ class XHSMonitor:
                     for note in latest_notes:
                         self.db.add_note_if_not_exists(note)
                 else:
+                    # 如果不是首次监控，则对最新的笔记进行点赞和评论
                     for note in latest_notes:
                         if self.db.add_note_if_not_exists(note):
                             print(f"发现新笔记: {note.get('display_title')}")
@@ -218,15 +220,17 @@ class XHSMonitor:
             time.sleep(interval)
 
 def main():
+    # 创建 XHSMonitor 实例，传入必要的配置
     monitor = XHSMonitor(
         cookie=XHS_CONFIG["COOKIE"],
         webhook_url=WECOM_CONFIG["WEBHOOK_URL"]
     )
-
+    # 开始监控用户，传入用户ID和检查间隔
     monitor.monitor_user(
         user_id=MONITOR_CONFIG["USER_ID"],
         interval=MONITOR_CONFIG["CHECK_INTERVAL"]
     )
+
 
 if __name__ == "__main__":
     main() 
