@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+from genericpath import exists
 import requests
 import json
 import re
@@ -12,15 +12,15 @@ from datetime import datetime, timedelta
 import argparse
 
 class TechDetectorWithCache:
-    def __init__(self, cache_file='tech_cache.db', cache_hours=24):
+    def __init__(self, cache_file='web_info.db', cache_hours=24):
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
         }
         self.cache_file = cache_file
         self.cache_hours = cache_hours
         self.init_cache()
         
-        # 检测规则（保持原有规则不变）
+        # 检测规则
         self.rules = {
             # JavaScript 框架/库
             'JavaScript 框架/库': {
@@ -258,7 +258,7 @@ class TechDetectorWithCache:
         conn = sqlite3.connect(self.cache_file)
         cursor = conn.cursor()
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS tech_cache (
+            CREATE TABLE IF NOT EXISTS web_info (
                 url TEXT PRIMARY KEY,
                 data TEXT,
                 timestamp TEXT
@@ -271,7 +271,7 @@ class TechDetectorWithCache:
         """从缓存获取数据"""
         conn = sqlite3.connect(self.cache_file)
         cursor = conn.cursor()
-        cursor.execute('SELECT data, timestamp FROM tech_cache WHERE url = ?', (url,))
+        cursor.execute('SELECT data, timestamp FROM web_info WHERE url = ?', (url,))
         result = cursor.fetchone()
         conn.close()
         
@@ -287,7 +287,7 @@ class TechDetectorWithCache:
         conn = sqlite3.connect(self.cache_file)
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT OR REPLACE INTO tech_cache (url, data, timestamp)
+            INSERT OR REPLACE INTO web_info (url, data, timestamp)
             VALUES (?, ?, ?)
         ''', (url, json.dumps(data), datetime.now().isoformat()))
         conn.commit()
@@ -394,56 +394,76 @@ class TechDetectorWithCache:
         return False
 
     def save_to_csv(self, results, filename=None):
-        """保存结果到CSV文件"""
+        """保存结果到CSV文件，追加新数据并保留自定义列"""
+    # 使用固定文件名，除非通过 --output 指定
         if not filename:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f'tech_detection_{timestamp}.csv'
+            filename = 'tech_detection.csv'
         
-        # 定义CSV列
-        fieldnames = ['URL', '状态', 'JavaScript框架/库', 'CSS框架', 'UI组件库', 
-                     'CMS', '后端技术', '服务器', '分析工具', '其他工具', 
-                     '检测时间', '缓存状态', '错误信息']
+        # 核心字段
+        core_fieldnames = ['URL', '状态', 'JavaScript框架/库', 'CSS框架', 'UI组件库', 
+                        'CMS', '后端技术', '服务器', '分析工具', '其他工具', 
+                        '检测时间', '缓存状态', '错误信息']
         
-        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+        # 检查文件是否存在并获取现有字段和数据
+        existing_urls = set()
+        existing_data = []
+        all_fieldnames = core_fieldnames.copy()  # 默认使用核心字段
+        file_exists = os.path.exists(filename)
+        
+        if file_exists:
+            try:
+                with open(filename, 'r', encoding='utf-8') as csvfile:
+                    reader = csv.DictReader(csvfile)
+                    # 获取现有字段（包括自定义列）
+                    all_fieldnames = reader.fieldnames or core_fieldnames
+                    # 确保核心字段都在
+                    for field in core_fieldnames:
+                        if field not in all_fieldnames:
+                            all_fieldnames.append(field)
+                    # 读取现有数据
+                    existing_data = list(reader)
+                    existing_urls = {row['URL'] for row in existing_data if 'URL' in row}
+            except Exception as e:
+                print(f"检查文件 {filename} 时出错: {e}")
+                # 如果文件损坏，保留核心字段继续写入
+        
+        # 准备写入数据
+        new_results = 0
+        with open(filename, 'a' if file_exists else 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=all_fieldnames, extrasaction='ignore')
+            # 如果文件不存在，写入表头
+            if not file_exists:
+                writer.writeheader()
             
+            # 写入未重复的URL结果
             for result in results:
-                if result['status'] == 'error':
-                    row = {
-                        'URL': result['url'],
-                        '状态': '检测失败',
-                        'JavaScript框架/库': '',
-                        'CSS框架': '',
-                        'UI组件库': '',
-                        'CMS': '',
-                        '后端技术': '',
-                        '服务器': '',
-                        '分析工具': '',
-                        '其他工具': '',
-                        '检测时间': result['timestamp'],
-                        '缓存状态': '缓存' if result.get('from_cache') else '实时',
-                        '错误信息': result.get('error', '')
-                    }
-                else:
-                    row = {
-                        'URL': result['url'],
-                        '状态': '成功',
-                        'JavaScript框架/库': result.get('JavaScript 框架/库', ''),
-                        'CSS框架': result.get('CSS 框架', ''),
-                        'UI组件库': result.get('UI 组件库', ''),
-                        'CMS': result.get('CMS', ''),
-                        '后端技术': result.get('后端技术', ''),
-                        '服务器': result.get('服务器', ''),
-                        '分析工具': result.get('分析工具', ''),
-                        '其他工具': result.get('其他工具', ''),
-                        '检测时间': result['timestamp'],
-                        '缓存状态': '缓存' if result.get('from_cache') else '实时',
-                        '错误信息': ''
-                    }
+                if result['url'] in existing_urls:
+                    print(f"URL {result['url']} 已存在，跳过保存。")
+                    continue
+                # 构建新行，保留现有字段的默认值
+                row = {field: '' for field in all_fieldnames}  # 初始化所有字段为空
+                row.update({
+                    'URL': result['url'],
+                    '状态': '检测失败' if result['status'] == 'error' else '成功',
+                    'JavaScript框架/库': result.get('JavaScript 框架/库', ''),
+                    'CSS框架': result.get('CSS 框架', ''),
+                    'UI组件库': result.get('UI 组件库', ''),
+                    'CMS': result.get('CMS', ''),
+                    '后端技术': result.get('后端技术', ''),
+                    '服务器': result.get('服务器', ''),
+                    '分析工具': result.get('分析工具', ''),
+                    '其他工具': result.get('其他工具', ''),
+                    '检测时间': result['timestamp'],
+                    '缓存状态': '缓存' if result.get('from_cache') else '实时',
+                    '错误信息': result.get('error', '') if result['status'] == 'error' else ''
+                })
                 writer.writerow(row)
-        
-        print(f"结果已保存到: {filename}")
+                existing_urls.add(result['url'])
+                new_results += 1
+        if new_results > 0:
+            print(f"已保存 {new_results} 条新结果到: {filename}")
+        else:
+            print(f"没有新结果保存到: {filename}")
         return filename
 
     def display_console(self, results):
@@ -488,7 +508,7 @@ class TechDetectorWithCache:
         """显示缓存统计"""
         conn = sqlite3.connect(self.cache_file)
         cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM tech_cache')
+        cursor.execute('SELECT COUNT(*) FROM web_info')
         count = cursor.fetchone()[0]
         conn.close()
         print(f"缓存中共有 {count} 条记录")
