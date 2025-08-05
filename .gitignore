@@ -7,7 +7,7 @@ __pycache__/
 *.pyo
 
 # Ignore system files
-.DS_Store
+*.DS_Store
 
 # Ignore IDE and editor-specific files (e.g., VS Code, PyCharm, etc.)
 .vscode/
